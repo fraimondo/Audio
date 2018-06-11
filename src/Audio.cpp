@@ -39,7 +39,9 @@ void AudioClass::begin(uint32_t bSize, int debug) {
 	__SamplesPending = 0;
 	__halfSample = __bufferSize / 2;
 	__nextBufferSample = 0;
-
+	analogWriteResolution(12);
+	analogWrite(DAC0, 0x800);
+	analogWrite(DAC1, 0x800);
 }
 
 void AudioClass::end() {
@@ -122,7 +124,10 @@ int AudioClass::prepare(File *toPlay){
 			Serial.println("Starting DAC");
 		}
 		// Start DAC
+		analogWrite(DAC0, 0x800);
+		analogWrite(DAC1, 0x800);
 		dac->begin(VARIANT_MCK / (__WavHeader->sample_rate * 2));
+
 		// dac->begin(VARIANT_MCK / 2);
 		dac->setOnTransmitEnd_CB(onTransmitEnd, this);
         return 0;
@@ -192,6 +197,8 @@ void AudioClass::play() {
 	}
 	while (__nextBufferSample != where_to);
 	dac->end();
+	analogWrite(DAC0, 0x800);
+	analogWrite(DAC1, 0x800);
 	if (__debug) {
 		Serial.println("done!");
 	}
