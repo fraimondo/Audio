@@ -1,44 +1,33 @@
 /*
- * Copyright (c) 2012 Arduino LLC. All right reserved.
- * DAC library for Arduino Due.
- *
- * This file is free software; you can redistribute it and/or modify
- * it under the terms of either the GNU General Public License version 2
- * or the GNU Lesser General Public License version 2.1, both as
- * published by the Free Software Foundation.
+ * I2S DAC Library for Arduino DUE
  */
 
-#ifndef DAC_INCLUDED
-#define DAC_INCLUDED
+#ifndef __DAC_HH__
+#define __DAC_HH__
 
-#include "Arduino.h"
+#include <Arduino.h>
 
-typedef void (*OnTransmitEnd_CB)(void *data);
+#define DAC_N_CHANNELS 2
+#define DAC_BIT_LEN_PER_CHANNEL 16
+#define DAC_SSC_IRQ_PRIO 1
 
-class DACClass
-{
+class DACClass {
 public:
-	DACClass(Dacc *_dac, uint32_t _dacId, IRQn_Type _isrId) :
-		dac(_dac), dacId(_dacId), isrId(_isrId), cb(NULL) { };
-	void begin(uint32_t period);
+	DACClass();
+	void setup(uint32_t srate, void(*tx_ready)(uint8_t), bool debug=false);
+	void start();
+	void stop();
 	void end();
-	bool canQueue();
-	size_t queueBuffer(const uint32_t *buffer, size_t size);
-	uint32_t *getCurrentQueuePointer();
-	void setOnTransmitEnd_CB(OnTransmitEnd_CB _cb, void *data);
+
+	void write(uint16_t value);
+
 	void onService();
 
-	void enableInterrupts()  { NVIC_EnableIRQ(isrId); };
-	void disableInterrupts() { NVIC_DisableIRQ(isrId); };
-
 private:
-	Dacc *dac;
-	uint32_t dacId;
-	IRQn_Type isrId;
-	OnTransmitEnd_CB cb;
-	void *cbData;
+	uint32_t *_dataOutAddr;
+	void (*_tx_ready)(uint8_t channel);
 };
 
 extern DACClass DAC;
 
-#endif
+#endif /* __DAC_HH__ */
