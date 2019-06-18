@@ -16,7 +16,7 @@ const PinDescription SSCTXPins[3] = {
 DACClass::DACClass() {
 }
 
-void DACClass::setup(uint32_t srate, void(*tx_ready)(uint8_t), bool debug) {
+void DACClass::setup(uint32_t srate, void(*tx_ready)(uint8_t)) {
 	
 	_tx_ready = tx_ready;
 	pmc_enable_periph_clk(ID_SSC);

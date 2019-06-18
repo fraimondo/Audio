@@ -19,7 +19,7 @@
 class AudioI2SClass {
 public:
 	AudioI2SClass() {};
-	void begin(uint32_t bSize, bool debug=0);
+	void begin(uint32_t bSize, bool debug=false);
 	int prepare(File *toPlay);
 	void play() ;
 	void end();

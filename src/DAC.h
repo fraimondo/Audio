@@ -14,7 +14,7 @@
 class DACClass {
 public:
 	DACClass();
-	void setup(uint32_t srate, void(*tx_ready)(uint8_t), bool debug=false);
+	void setup(uint32_t srate, void(*tx_ready)(uint8_t));
 	void start();
 	void stop();
 	void end();
