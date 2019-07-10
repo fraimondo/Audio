@@ -71,12 +71,39 @@ void AudioI2SClass::end() {
 extern "C" {
 #endif
 
-void I2S_DAC_Handler (uint8_t channel) {
+void I2S_DAC_Handler_MONO(uint8_t channel) {
 	// Write next sample
 	if ((__SampleIndex != __StopAtIndex) && __StartFlag != false) {
+		DAC.write((__WavSamples[__SampleIndex] + NEUTRAL_VALUE));
+		if (channel == 2) {
+			__SampleIndex++;
+		}
+	} else {
+		DAC.write(IDLE_VALUE);
+	}
+
+	if (__samples_callback != 0 && __StartFlag != false &&
+			(__SampleIndex != __StopAtIndex)) {
+		if (__samples_next_callback == 0 ) {
+			__callback();
+			__samples_next_callback = __samples_callback;
+		}
+		__samples_next_callback--;
+	}
+	// If it was the last sample in the buffer, start again
+	if (__SampleIndex == __bufferSize - 1) {
+		__SampleIndex = 0;
+	}
+}
+
+
+void I2S_DAC_Handler_STEREO(uint8_t channel) {
+	// Write next sample
+	if ((__SampleIndex != __StopAtIndex) && __StartFlag != false) {
+		// If it's stereo, do the proper handling
 		if (channel == 1) {
 			DAC.write((__WavSamples[(__SampleIndex << 1)] + NEUTRAL_VALUE));
-		} else {
+		} else {		
 			DAC.write((__WavSamples[(__SampleIndex << 1) + 1] + NEUTRAL_VALUE));
 			__SampleIndex++;
 		}
@@ -132,8 +159,19 @@ int AudioI2SClass::prepare(File * toPlay){
 		}
 		// Read WAV Header
 		__toPlay->read(__WavHeader, WAV_HEADER_SIZE);
-
-		DAC.setup(__WavHeader->sample_rate, I2S_DAC_Handler);
+		if (__WavHeader->number_of_channels == 1) {
+			if (__debug) {
+				Serial.println("Detected MONO wav file");
+			}
+			free(__WavSamples);
+			__WavSamples = (int16_t *) malloc(__bufferSize * sizeof(int16_t));
+			DAC.setup(__WavHeader->sample_rate, I2S_DAC_Handler_MONO);
+		} else {
+			if (__debug) {
+				Serial.println("Detected STEREO wav file");
+			}
+			DAC.setup(__WavHeader->sample_rate, I2S_DAC_Handler_STEREO);
+		}
 
 		if (__debug) {
 			Serial.println("Reading Data header");
@@ -141,7 +179,7 @@ int AudioI2SClass::prepare(File * toPlay){
 		__toPlay->seek(RIFF_HEADER_SIZE + __WavHeader->data_header_length + 8);
 
 		__toPlay->read(__DataHeader, DATA_HEADER_SIZE);
-		__SamplesPending = __DataHeader->data_length / sizeof(int16_t) / 2;
+		__SamplesPending = __DataHeader->data_length / sizeof(int16_t) / __WavHeader->number_of_channels;
 
 		if (__debug) {
 			Serial.print("Samples to play: ");
@@ -154,7 +192,7 @@ int AudioI2SClass::prepare(File * toPlay){
 			Serial.print("Reading samples N=");
 			Serial.println(to_read);
 		}
-		__toPlay->read(__WavSamples, to_read  * sizeof(int16_t) * 2);
+		__toPlay->read(__WavSamples, to_read  * sizeof(int16_t) * __WavHeader->number_of_channels);
 		__HeadIndex = 0;
 		__SamplesPending -= to_read;
 		if (__debug) {
@@ -172,8 +210,10 @@ void AudioI2SClass::play() {
 	int available = 0;
 	uint32_t current__SampleIndex;
 	__StartFlag = true;
+	uint32_t shifter = __WavHeader->number_of_channels - 1;
 	while ((available = __toPlay->available()) && __SamplesPending > 0) {
-		available = available / sizeof(int16_t) / 2; // Convert from bytes to samples
+		 // Convert from bytes to samples
+		available = available / sizeof(int16_t) / __WavHeader->number_of_channels;
 		current__SampleIndex = __SampleIndex;
 
 		if (current__SampleIndex > __HeadIndex) {
@@ -183,7 +223,7 @@ void AudioI2SClass::play() {
 					// If we have less bytes to read, read the missing and stop
 					to_read = available;
 				}
-				__toPlay->read(&__WavSamples[__HeadIndex << 1], to_read * sizeof(int16_t)  * 2);
+				__toPlay->read(&__WavSamples[__HeadIndex << shifter], to_read * sizeof(int16_t)  * __WavHeader->number_of_channels);
 				__SamplesPending -= to_read;
 				__StopAtIndex = to_read + __HeadIndex-1;
 				__HeadIndex = current__SampleIndex;
@@ -199,7 +239,7 @@ void AudioI2SClass::play() {
 					// If not, we have less bytes available
 					available -= to_read;
 				}
-				__toPlay->read(&__WavSamples[__HeadIndex << 1], to_read  * sizeof(int16_t) * 2);
+				__toPlay->read(&__WavSamples[__HeadIndex << shifter], to_read  * sizeof(int16_t) * __WavHeader->number_of_channels);
 				__SamplesPending -= to_read;
 				if (available > 0) {
 					to_read = min(current__SampleIndex, __SamplesPending);
@@ -208,7 +248,7 @@ void AudioI2SClass::play() {
 							// If we have less bytes to read, read the missing and stop
 							to_read = available;
 						}
-						__toPlay->read(__WavSamples, to_read  * sizeof(int16_t) * 2);
+						__toPlay->read(__WavSamples, to_read  * sizeof(int16_t) * __WavHeader->number_of_channels);
 						__SamplesPending -= to_read;
 						__StopAtIndex = to_read - 1;
 					}
